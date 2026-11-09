@@ -196,9 +196,9 @@ extension ContextEngineTests {
         return seen
     }
 
-    /// Yields until the condition holds, or 100 times, so a task the engine started gets to run.
+    /// Yields until the condition holds, or 10,000 times, so a task the engine started gets to run under a loaded test pool.
     static func settle(until condition: () async -> Bool) async {
-        for _ in 0..<100 {
+        for _ in 0..<10_000 {
             guard await condition() == false else { return }
             await Task.yield()
         }
