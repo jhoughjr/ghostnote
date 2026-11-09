@@ -1,17 +1,20 @@
 name: build
 
 # The forge pull mirror runs this workflow. It must live here on GitHub, because the mirror deletes a path that the source does not carry.
-# Replace the check step with the Swift build when the engine package exists.
+# The engine imports AppKit, so the job runs on the mini's macOS host and not in the Linux container.
 on:
   push:
   workflow_dispatch:
 
 jobs:
-  check:
-    runs-on: [self-hosted, linux, arm64]
-    container: roost-ci:arm64
+  build:
+    runs-on: [self-hosted, macos, arm64]
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
 
-      - name: check
-        run: git log -1 --oneline
+      - name: build
+        run: swift build
+
+      - name: test
+        run: swift test
