@@ -1,6 +1,6 @@
 import Foundation
 
-/// The context engine, which watches the front app and publishes each new context chain to every subscriber (G-05, G-15).
+/// The context engine watches the front app and publishes each new context chain to every subscriber (G-05, G-15).
 /// One actor owns the current chain and the subscriber map, so no subscriber sees a chain out of order.
 /// It publishes a chain only when the chain differs from the one it published last (G-12).
 public actor ContextEngine {
@@ -35,7 +35,7 @@ public actor ContextEngine {
         self.watchers = [:]
     }
 
-    /// The chain the engine published last, or nil before the first reading.
+    /// Returns the chain the engine published last, or nil before the first reading.
     public func currentChain() -> ContextChain? {
         self.current
     }
@@ -54,7 +54,7 @@ public actor ContextEngine {
 // MARK: - Subscribers
 
 extension ContextEngine {
-    /// A stream of every chain from now on, which starts with the current chain when one exists.
+    /// Returns a stream of every chain after the call, which starts with the current chain when one exists.
     /// Each call gets its own stream, which ends at `unwatch(_:)`, at `stop()`, or when its reader ends (R-002-08).
     public func watch() -> (UUID, AsyncStream<ContextChain>) {
         let id = UUID()
@@ -74,7 +74,7 @@ extension ContextEngine {
         self.watchers[id] = nil
     }
 
-    /// The number of open subscriber streams, for the tests.
+    /// Returns the number of open subscriber streams, for the tests.
     func watcherCount() -> Int {
         self.watchers.count
     }

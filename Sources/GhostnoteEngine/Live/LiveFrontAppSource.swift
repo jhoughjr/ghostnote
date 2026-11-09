@@ -1,7 +1,7 @@
 import AppKit
 import ApplicationServices
 
-/// The live source: an NSWorkspace activation notification for the app, and an AXObserver on the front app for its window (G-14).
+/// The live source reads the app from an NSWorkspace activation notification and the window from an AXObserver on the front app (G-14).
 /// It runs on the main actor, because the notification and the observer's run loop source both deliver on the main run loop.
 /// It never polls and never asks for the Accessibility grant, so without the grant it reports the app alone (G-08).
 @MainActor
@@ -58,7 +58,8 @@ final class LiveFrontAppSource: FrontAppSource {
     }
 
     func report() {
-        guard let app = NSWorkspace.shared.frontmostApplication, let bundleID = app.bundleIdentifier else { return } // No app scope to report.
+        // An app with no bundle identifier has no app scope to report.
+        guard let app = NSWorkspace.shared.frontmostApplication, let bundleID = app.bundleIdentifier else { return }
         var reading = FrontReading(bundleID: bundleID, trusted: AXIsProcessTrusted())
         if reading.trusted, let window = LiveFrontAppSource.focusedWindow(pid: app.processIdentifier) {
             reading.document = LiveFrontAppSource.string(window, kAXDocumentAttribute)

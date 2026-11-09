@@ -1,6 +1,6 @@
 import Foundation
 
-/// The normalized path of a file, so that two routes to one file give one key (G-10).
+/// A file key is the normalized path of a file, so that two routes to one file give one key (G-10).
 /// The path has its dot segments removed and its symbolic links resolved, and a file that exists gets its on-disk case.
 /// Equality uses the path alone, and a store asks for `bookmarkData()` only when it saves a note.
 public struct FileKey: Sendable, Hashable {

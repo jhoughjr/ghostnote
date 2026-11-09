@@ -1,4 +1,4 @@
-/// The key that a later store matches a note against.
+/// A scope key is the key that a later store matches a note against.
 ///
 /// - app: the bundle identifier of the front app.
 /// - file: a file, global across apps (G-04).

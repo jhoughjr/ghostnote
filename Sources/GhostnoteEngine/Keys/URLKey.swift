@@ -1,10 +1,10 @@
 import Foundation
 
-/// The normalized form of a web page address, so that two visits to one page give one key (G-11).
+/// A URL key is the normalized form of a web page address, so that two visits to one page give one key (G-11).
 /// It removes the fragment, the tracking parameters, every trailing slash, the user and the password, and it lowercases the scheme and the host.
 /// It keeps the port, the path case, the percent-encoding and the order of the other parameters as given.
 public struct URLKey: Sendable, Hashable {
-    /// The query names that only track a visit and never select a page.
+    /// These query names only track a visit and never select a page.
     /// A name that starts with `utm_` is also a tracking name, see `isTracking(_:)`.
     static let trackingNames: Set<String> = ["fbclid", "gclid", "dclid", "msclkid", "mc_cid", "mc_eid", "igshid", "yclid"]
 
