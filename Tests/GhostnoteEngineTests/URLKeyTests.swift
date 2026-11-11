@@ -15,10 +15,20 @@ struct URLKeyTests {
             ("https://example.com/s?q=a%2Bb", "https://example.com/s?q=a%2Bb"),
             ("https://example.com/a%2F/", "https://example.com/a%2F"),
             ("https://user:pw@Example.com/a", "https://example.com/a"),
+            ("https://example.com/a//", "https://example.com/a"),
+            ("https://example.com///", "https://example.com"),
         ]
     )
     func normalizes(raw: String, expected: String) {
         #expect(URLKey(raw)?.string == expected)
+    }
+
+    @Test(
+        "A URL key removes each tracking name",
+        arguments: ["fbclid", "gclid", "dclid", "msclkid", "mc_cid", "mc_eid", "igshid", "yclid"]
+    )
+    func removesTrackingName(name: String) {
+        #expect(URLKey("https://example.com/a?\(name)=x&id=7")?.string == "https://example.com/a?id=7")
     }
 
     @Test(
