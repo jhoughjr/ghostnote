@@ -141,6 +141,29 @@ struct ContextEngineTests {
         #expect(await engine.currentChain() == ContextEngineTests.chain("com.a"))
     }
 
+    @Test("A reading in flight at stop changes no chain after stop returns", arguments: 0..<200)
+    func stopDropsInFlight(run: Int) async {
+        // given a running engine that has published a
+        let source = FakeFrontAppSource()
+        var reads = source.reads.makeAsyncIterator()
+        var ends = source.ends.makeAsyncIterator()
+        let engine = ContextEngine(source: source)
+        let (_, stream) = await engine.watch()
+        var chains = stream.makeAsyncIterator()
+        await engine.start()
+        await reads.next()
+        source.send(ContextEngineTests.reading("com.a"))
+        _ = await chains.next()
+
+        // when the source sends b inside the actor call that stops the engine, the source stream ends, and queued work runs
+        await engine.stop(inFlight: ContextEngineTests.reading("com.b"), from: source)
+        await ends.next()
+        await Wait.window(100)
+
+        // then the current chain is still a
+        #expect(await engine.currentChain() == ContextEngineTests.chain("com.a"))
+    }
+
     @Test("A start after a stop reads the source again and publishes")
     func startAfterStop() async {
         // given an engine that started and stopped once
@@ -211,5 +234,15 @@ extension ContextEngineTests {
             seen.append(chain)
         }
         return seen
+    }
+}
+
+// MARK: - A reading in flight at stop
+
+extension ContextEngine {
+    /// Sends a reading through the fake source and stops in one actor call, so the reading is in flight when the read ends.
+    func stop(inFlight reading: FrontReading, from source: FakeFrontAppSource) {
+        source.send(reading)
+        self.stop()
     }
 }

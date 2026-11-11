@@ -19,6 +19,8 @@ public actor ContextEngine {
         guard self.task == nil else { return }
         self.task = Task {
             for await reading in await self.source.readings() {
+                // A reading that reached the task before stop() and waited for the actor belongs to an ended read (R-002-09).
+                guard Task.isCancelled == false else { break }
                 self.receive(reading)
             }
         }
