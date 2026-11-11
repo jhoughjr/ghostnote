@@ -3,7 +3,11 @@ import Testing
 @testable import GhostnoteEngine
 
 /// Runs against the real front app, so it needs a Mac session with the Accessibility grant and stays off unless GHOSTNOTE_LIVE is 1.
-@Suite("Live engine", .enabled(if: ProcessInfo.processInfo.environment["GHOSTNOTE_LIVE"] == "1"))
+@Suite(
+    "Live engine",
+    .enabled(if: ProcessInfo.processInfo.environment["GHOSTNOTE_LIVE"] == "1"),
+    .timeLimit(.minutes(1))
+)
 struct LiveEngineTests {
     @Test("The live engine publishes the front app first")
     func firstChain() async throws {
@@ -33,9 +37,7 @@ struct LiveEngineTests {
         // when the reader ends, as the engine's stop ends it
         reader.cancel()
         await reader.value
-        for _ in 0..<100 where source.activation != nil {
-            await Task.yield()
-        }
+        await Wait.until("the queued teardown leaves the activation observer") { source.activation == nil }
 
         // then nothing stays registered
         #expect(source.activation == nil)

@@ -1,7 +1,7 @@
 import Testing
 @testable import GhostnoteEngine
 
-@Suite("URL key")
+@Suite("URL key", .timeLimit(.minutes(1)))
 struct URLKeyTests {
     @Test(
         "A URL key normalizes a page address",

@@ -1,8 +1,7 @@
-import Synchronization
 import Testing
 @testable import GhostnoteEngine
 
-@Suite("Context engine")
+@Suite("Context engine", .timeLimit(.minutes(1)))
 struct ContextEngineTests {
     static func reading(_ bundleID: String) -> FrontReading {
         FrontReading(bundleID: bundleID, trusted: true, document: nil, url: nil, title: nil)
@@ -68,17 +67,23 @@ struct ContextEngineTests {
 
     @Test("Start reads the source")
     func startReadsSource() async {
+        // given a subscriber on an engine over a fake source
         let source = FakeFrontAppSource()
+        var reads = source.reads.makeAsyncIterator()
         let engine = ContextEngine(source: source)
         let (_, stream) = await engine.watch()
-        await engine.start()
-        await ContextEngineTests.settle { source.readCount > 0 }
+        var chains = stream.makeAsyncIterator()
 
+        // when the engine starts and the source reports a
+        await engine.start()
+        await reads.next()
         source.send(ContextEngineTests.reading("com.a"))
-        await ContextEngineTests.settle { await engine.currentChain() != nil }
+        let first = await chains.next()
         await engine.stop()
 
-        #expect(await ContextEngineTests.drain(stream) == [ContextEngineTests.chain("com.a")])
+        // then the subscriber gets a, and the stream ends at the stop
+        #expect(first == ContextEngineTests.chain("com.a"))
+        #expect(await chains.next() == nil)
     }
 
     @Test("A subscriber that stops reading leaves the map")
@@ -94,19 +99,20 @@ struct ContextEngineTests {
         reader.cancel()
         await reader.value
 
-        // then the engine drops the continuation
-        await ContextEngineTests.settle { await engine.watcherCount() == 0 }
-        #expect(await engine.watcherCount() == 0)
+        // then the engine drops the continuation, through the removal that the stream's end queued
+        await Wait.until("the engine keeps the stream of a reader that ended") { await engine.watcherCount() == 0 }
     }
 
     @Test("A second start reads the source once")
     func startTwice() async {
         let source = FakeFrontAppSource()
+        var reads = source.reads.makeAsyncIterator()
         let engine = ContextEngine(source: source)
 
         await engine.start()
         await engine.start()
-        await ContextEngineTests.settle { source.readCount > 1 }
+        await reads.next()
+        await Wait.window(1_000)
 
         #expect(source.readCount == 1)
         await engine.stop()
@@ -116,16 +122,20 @@ struct ContextEngineTests {
     func stopCancels() async {
         // given a running engine that has published a
         let source = FakeFrontAppSource()
+        var reads = source.reads.makeAsyncIterator()
+        var ends = source.ends.makeAsyncIterator()
         let engine = ContextEngine(source: source)
+        let (_, stream) = await engine.watch()
+        var chains = stream.makeAsyncIterator()
         await engine.start()
-        await ContextEngineTests.settle { source.readCount > 0 }
+        await reads.next()
         source.send(ContextEngineTests.reading("com.a"))
-        await ContextEngineTests.settle { await engine.currentChain() != nil }
+        _ = await chains.next()
 
-        // when the engine stops and the source sends b
+        // when the engine stops, the source stream ends, and the source sends b
         await engine.stop()
+        await ends.next()
         source.send(ContextEngineTests.reading("com.b"))
-        await ContextEngineTests.settle { await engine.currentChain() != ContextEngineTests.chain("com.a") }
 
         // then the current chain is still a
         #expect(await engine.currentChain() == ContextEngineTests.chain("com.a"))
@@ -133,21 +143,27 @@ struct ContextEngineTests {
 
     @Test("A start after a stop reads the source again and publishes")
     func startAfterStop() async {
+        // given an engine that started and stopped once
         let source = FakeFrontAppSource()
+        var reads = source.reads.makeAsyncIterator()
         let engine = ContextEngine(source: source)
         await engine.start()
-        await ContextEngineTests.settle { source.readCount > 0 }
+        await reads.next()
         await engine.stop()
 
+        // when a subscriber watches, the engine starts again, and the source reports b
         let (_, stream) = await engine.watch()
+        var chains = stream.makeAsyncIterator()
         await engine.start()
-        await ContextEngineTests.settle { source.readCount > 1 }
+        await reads.next()
         source.send(ContextEngineTests.reading("com.b"))
-        await ContextEngineTests.settle { await engine.currentChain() != nil }
+        let first = await chains.next()
         await engine.stop()
 
+        // then the source was read twice, and the subscriber gets b
         #expect(source.readCount == 2)
-        #expect(await ContextEngineTests.drain(stream) == [ContextEngineTests.chain("com.b")])
+        #expect(first == ContextEngineTests.chain("com.b"))
+        #expect(await chains.next() == nil)
     }
 
     @Test("A watch after a stop stays open and starts with the current chain")
@@ -165,22 +181,23 @@ struct ContextEngineTests {
 
     @Test("Stop finishes every open stream")
     func stopFinishes() async {
-        // given a subscriber that reads in a task and marks its end
+        // given a subscriber that reads in a task
         let engine = ContextEngine(source: FakeFrontAppSource())
         let (_, stream) = await engine.watch()
-        let ended = Mutex(false)
         let reader = Task {
             for await _ in stream {}
-            ended.withLock { $0 = true }
         }
 
-        // when the engine stops
+        // when the engine stops, and the time limit's cancel reaches the reader so a missing finish fails and does not hang
         await engine.stop()
-        await ContextEngineTests.settle { ended.withLock { $0 } }
+        await withTaskCancellationHandler {
+            await reader.value
+        } onCancel: {
+            reader.cancel()
+        }
 
         // then the reader's loop has ended without a cancel
-        #expect(ended.withLock { $0 })
-        reader.cancel()
+        #expect(reader.isCancelled == false)
     }
 }
 
@@ -194,13 +211,5 @@ extension ContextEngineTests {
             seen.append(chain)
         }
         return seen
-    }
-
-    /// Yields until the condition holds, or 10,000 times, so a task the engine started gets to run under a loaded test pool.
-    static func settle(until condition: () async -> Bool) async {
-        for _ in 0..<10_000 {
-            guard await condition() == false else { return }
-            await Task.yield()
-        }
     }
 }

@@ -2,7 +2,7 @@ import Foundation
 import Testing
 @testable import GhostnoteEngine
 
-@Suite("File key")
+@Suite("File key", .timeLimit(.minutes(1)))
 struct FileKeyTests {
     @Test("A file key removes dot segments")
     func removesDotSegments() {

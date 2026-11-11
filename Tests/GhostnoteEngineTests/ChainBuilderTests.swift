@@ -1,7 +1,7 @@
 import Testing
 @testable import GhostnoteEngine
 
-@Suite("Chain builder")
+@Suite("Chain builder", .timeLimit(.minutes(1)))
 struct ChainBuilderTests {
     static let appScope = ContextScope(level: "app", state: .found(.app(bundleID: "com.example.editor")))
 
