@@ -22,6 +22,28 @@ struct LiveEngineTests {
         await engine.stop()
     }
 
+    @Test("A front app with no bundle identifier publishes a chain keyed by its path")
+    @MainActor
+    func noBundleIDPublishes() async throws {
+        // given a live engine that has published the front app
+        let source = LiveFrontAppSource()
+        let engine = ContextEngine(source: source)
+        let (_, stream) = await engine.watch()
+        var chains = stream.makeAsyncIterator()
+        await engine.start()
+        _ = await chains.next()
+
+        // when the source reports the front app with its bundle identifier forced to nil
+        let front = try #require(NSWorkspace.shared.frontmostApplication)
+        let identity = try #require(AppIdentity(bundleID: nil, appURL: front.bundleURL ?? front.executableURL))
+        source.report(identity, pid: front.processIdentifier)
+
+        // then the engine publishes a chain whose app scope is found by the path
+        let next = await chains.next()
+        #expect(next?.scopes.first == ContextScope(level: "app", state: .found(.app(identity))))
+        await engine.stop()
+    }
+
     @Test("The end of the stream removes both observers and the run loop source")
     @MainActor
     func stopReleasesObservers() async throws {

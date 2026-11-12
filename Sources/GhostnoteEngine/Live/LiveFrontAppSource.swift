@@ -62,19 +62,23 @@ final class LiveFrontAppSource: FrontAppSource {
     }
 
     /// Moves the AXObserver to the front app when the app changed or no observer exists, and reports a reading.
+    /// An app activation and an AX callback both arrive here.
     func frontChanged() {
         guard let app = NSWorkspace.shared.frontmostApplication else { return } // No app is in front, so nothing changed.
         if app.processIdentifier != self.observedPID || self.observer == nil {
             self.observe(pid: app.processIdentifier)
         }
-        self.report()
+        // An app with no bundle identifier is named by its path (R-002-13).
+        guard let identity = AppIdentity(bundleID: app.bundleIdentifier, appURL: app.bundleURL ?? app.executableURL) else {
+            LiveFrontAppSource.logger.error("Front app pid \(app.processIdentifier) has no bundle identifier and no path, so it gives no reading.")
+            return
+        }
+        self.report(identity, pid: app.processIdentifier)
     }
 
-    func report() {
-        // An app with no bundle identifier has no app scope to report.
-        guard let app = NSWorkspace.shared.frontmostApplication, let bundleID = app.bundleIdentifier else { return }
-        var reading = FrontReading(bundleID: bundleID, trusted: AXIsProcessTrusted())
-        if reading.trusted, let window = LiveFrontAppSource.focusedWindow(pid: app.processIdentifier) {
+    func report(_ app: AppIdentity, pid: pid_t) {
+        var reading = FrontReading(app: app, trusted: AXIsProcessTrusted())
+        if reading.trusted, let window = LiveFrontAppSource.focusedWindow(pid: pid) {
             reading.document = LiveFrontAppSource.string(window, kAXDocumentAttribute)
             reading.url = LiveFrontAppSource.string(window, kAXURLAttribute)
             reading.title = LiveFrontAppSource.string(window, kAXTitleAttribute)
@@ -97,7 +101,7 @@ final class LiveFrontAppSource: FrontAppSource {
                 return
             }
             let source = Unmanaged<LiveFrontAppSource>.fromOpaque(refcon).takeUnretainedValue()
-            MainActor.assumeIsolated { source.report() }
+            MainActor.assumeIsolated { source.frontChanged() }
         }
         let created = AXObserverCreate(pid, callback, &made)
         guard created == .success, let made else {

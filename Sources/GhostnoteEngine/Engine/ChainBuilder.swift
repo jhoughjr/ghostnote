@@ -3,7 +3,7 @@ import Foundation
 /// Builds a chain from one reading, with the default strategy order that applies when no manifest exists (G-06).
 enum ChainBuilder {
     static func chain(for reading: FrontReading) -> ContextChain {
-        let app = ContextScope(level: "app", state: .found(.app(bundleID: reading.bundleID)))
+        let app = ContextScope(level: "app", state: .found(.app(reading.app)))
         return ContextChain(scopes: [app, ChainBuilder.document(for: reading)])
     }
 
@@ -14,7 +14,7 @@ enum ChainBuilder {
         let candidates: [ScopeKey?] = [
             reading.document.flatMap(ChainBuilder.key(forAddress:)),
             reading.url.flatMap(ChainBuilder.key(forAddress:)),
-            reading.title.flatMap { $0.isEmpty ? nil : ScopeKey.title(bundleID: reading.bundleID, title: $0) },
+            reading.title.flatMap { $0.isEmpty ? nil : ScopeKey.title(app: reading.app, title: $0) },
         ]
         guard let key = candidates.compactMap({ $0 }).first else { return ContextScope(level: "document", state: .noStrategy) }
         return ContextScope(level: "document", state: .found(key))

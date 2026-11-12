@@ -4,7 +4,7 @@ import Testing
 @Suite("Context engine", .timeLimit(.minutes(1)))
 struct ContextEngineTests {
     static func reading(_ bundleID: String) -> FrontReading {
-        FrontReading(bundleID: bundleID, trusted: true, document: nil, url: nil, title: nil)
+        FrontReading(app: .bundleID(bundleID), trusted: true, document: nil, url: nil, title: nil)
     }
 
     static func chain(_ bundleID: String) -> ContextChain {
